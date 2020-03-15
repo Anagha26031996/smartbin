@@ -1,0 +1,297 @@
+#include <Ultrasonic.h>
+
+#include <Servo.h>
+Servo servo;
+
+
+#include <MD_Parola.h>
+#include <MD_MAX72xx.h>
+#include <SPI.h>
+#include <ESP8266WiFi.h>
+#include <MQTT.h>
+#include <Arduino_JSON.h>
+
+#define echoPin D2 // Echo Pin
+#define trigPin D8 // Trigger Pin
+#define echoPin1 D3 // Echo Pin
+#define trigPin1 D9 // Trigger Pin
+ 
+float duration, distance,range,duration1; // Duration used to calculate distance
+ 
+JSONVar myArray;
+const char ssid[] = "our user name";
+const char pass[] = "our password";
+
+
+
+// Turn on debug statements to  the serial output
+#define DEBUG 0
+
+#if DEBUG
+#define PRINT(s, x) { Serial.print(F(s)); Serial.print(x); }
+#define PRINTS(x) Serial.print(F(x))
+#define PRINTX(x) Serial.println(x, HEX)
+#else
+#define PRINT(s, x)
+#define PRINTS(x)
+#define PRINTX(x)
+#endif
+
+// Define the number of devices we have in the chain and the hardware interface
+// NOTE: These pin numbers will probably not work with your hardware and may
+// need to be adapted
+#define HARDWARE_TYPE MD_MAX72XX::FC16_HW
+#define MAX_DEVICES 5
+#define CLK_PIN   13           
+#define DATA_PIN  7
+#define CS_PIN    4
+
+// HARDWARE SPI
+MD_Parola P = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+// SOFTWARE SPI
+//MD_Parola P = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
+ 
+
+uint8_t scrollSpeed = 20;    // default frame delay value
+textEffect_t scrollEffect = PA_SCROLL_LEFT;
+textPosition_t scrollAlign = PA_LEFT;
+uint16_t scrollPause = 100; // in milliseconds
+WiFiClient net;
+MQTTClient client;
+int i=0;
+unsigned long lastMillis = 0;
+ const char* sensor;
+char per[12];
+
+
+// Global message buffers shared by Serial and Scrolling functions
+#define  BUF_SIZE  75
+char curMessage[BUF_SIZE] = { "" };
+char newMessage[BUF_SIZE] = { "Full" };
+bool newMessageAvailable = true;
+char curMessage1[BUF_SIZE] = { "" };
+char newMessage1[BUF_SIZE] = { "empty" };
+bool newMessage1Available = true;
+char curMessage2[BUF_SIZE] = { "" };
+char newMessage2[BUF_SIZE] = { "use bin" };
+bool newMessage2Available = true;
+
+
+ 
+void readSerial(void)
+{
+  static char *cp = newMessage;
+
+  while (Serial.available())
+  {
+    *cp = (char)Serial.read();
+    if ((*cp == '\n') || (cp - newMessage >= BUF_SIZE-2)) // end of message character or full buffer
+    {
+      *cp = '\0'; // end the string
+      // restart the index for next filling spree and flag we have a message waiting
+      cp = newMessage;
+      newMessageAvailable = true;
+    }
+    else  // move char pointer to next position
+      cp++;
+  }
+}
+
+void setup() {
+               Serial.begin(57600);
+               pinMode(trigPin, OUTPUT);
+               pinMode(echoPin, INPUT);
+               pinMode(trigPin1, OUTPUT);
+               pinMode(echoPin1, INPUT);
+               servo.attach(D14); //D4
+
+servo.write(0);
+
+delay(2000);
+ 
+
+  P.begin();
+  P.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
+               WiFi.begin(ssid, pass);
+               client.begin("broker.shiftr.io", net);
+              
+            pinMode(LED_BUILTIN, OUTPUT);
+            digitalWrite(LED_BUILTIN, HIGH);
+            pinMode(D2,INPUT);
+              connect();
+              }
+void connect() {
+               Serial.print("checking wifi...");
+               while (WiFi.status() != WL_CONNECTED) {
+                                                      Serial.print(".");
+                                                      delay(1000);
+                                                     }
+
+               Serial.print("\nconnecting...");
+
+
+               
+               while (!client.connect("arduino", "smart_bin", "12345678")) {
+                                                                                   Serial.print(".");
+                                                                                   delay(1000);
+                                                                                   }
+               Serial.println("\nconnected!");
+
+               client.subscribe("/smart_bin");
+                }
+void messageReceived(String &topic, String &payload) {
+                                                                  Serial.println(payload);
+                                                                 }
+
+void loop() {
+            Serial.println(".........reads ultrasonic sensor");
+            digitalWrite(trigPin, LOW);
+            delayMicroseconds(2);
+            digitalWrite(trigPin, HIGH);
+            delayMicroseconds(10);
+            digitalWrite(trigPin, LOW);
+            duration = pulseIn(echoPin, HIGH);
+            //Calculate the distance (in cm) based on the speed of sound.
+            distance = duration/58.2;
+            Serial.println(distance);
+            myArray[0]=per;
+            String jsonString=JSON.stringify(myArray);
+            client.loop();
+            delay(5);  // <- fixes some issues with WiFi stability
+          
+            if (!client.connected()) {
+                                       connect();
+                                     }
+                                                client.publish("/smart_bin",jsonString);
+                                                delay(50);
+            client.onMessage(messageReceived);
+            
+
+
+
+
+
+
+
+if(distance<5)
+{
+  
+ strcpy(per,"100%...FULL");
+  Serial.println(per);
+    //Serial.println(".....full");
+   
+    Serial.println("waste bin closed");
+    //delay(1000);
+    
+  if (P.displayAnimate())
+  {
+    if (newMessageAvailable)
+    {
+      strcpy(curMessage, newMessage);
+      newMessageAvailable = true;
+    }
+   P.displayReset();
+  
+}
+}
+else 
+{
+Serial.println(".........reads ultrasonic sensor to detect");
+ digitalWrite(trigPin1, LOW);
+ delayMicroseconds(2);
+ digitalWrite(trigPin1, HIGH);
+ delayMicroseconds(5);
+ digitalWrite(trigPin1, LOW);
+ duration1 = pulseIn(echoPin1, HIGH);
+            //Calculate the distance (in cm) based on the speed of sound.
+ range = duration1/58.2;
+ Serial.println("range");
+ Serial.println(range);
+  if(range<=10)
+  {
+  Serial.println("motor on...........");
+  
+  servo.write(90);
+  delay(5000);
+
+  servo.write(0);
+  delay(1000);
+
+  
+  }
+if(distance >5 && distance<8)
+{
+
+  strcpy(per,"75%");
+  Serial.println(per);
+  //delay(1000);
+  if (P.displayAnimate())
+  {
+    if (newMessage2Available)
+    {
+      strcpy(curMessage, newMessage2);
+      newMessage2Available = true;
+    }
+   P.displayReset();
+  
+}
+}
+
+if(distance >8 && distance<12)
+{
+
+  strcpy(per,"50%");
+  Serial.println(per);
+  //delay(1000);
+  if (P.displayAnimate())
+  {
+    if (newMessage2Available)
+    {
+      strcpy(curMessage, newMessage2);
+      newMessage2Available = true;
+    }
+   P.displayReset();
+  
+}
+}
+
+if(distance >12 && distance<15)
+{
+
+  strcpy(per,"25%");
+  Serial.println(per);
+  //delay(1000);
+  if (P.displayAnimate())
+  {
+    if (newMessage2Available)
+    {
+      strcpy(curMessage, newMessage2);
+      newMessage2Available = true;
+    }
+   P.displayReset();
+  
+}
+}
+
+if(distance>15)
+{
+  
+  strcpy(per,"0%...EMPTY");
+  Serial.println(per);
+  //Serial.println(".........empty");
+ 
+  //delay(1000);
+
+  if (P.displayAnimate())
+  {
+    if (newMessage1Available)
+    {
+      strcpy(curMessage, newMessage1);
+      newMessage1Available = true;
+    }
+   P.displayReset();
+  
+}
+}
+}
+}
