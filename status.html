@@ -1,0 +1,72 @@
+<html>
+<head>
+	<title>SMART DUSTBIN STATUS</title>
+	<link rel="stylesheet" type="text/css" href="css/status.css ">
+			<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+		<script src="https://assets.shiftr.io/js/mqtt-2.9.0.js"></script>
+</head>
+<body>
+	<header>
+		 <div class="main">
+			<ul>
+				<li><a href="index.html">Home</a></li>
+				<li class="active" id="butn"><a href="#">Status</a></li>
+				
+				
+				
+			
+			</ul>
+		</div>
+		<div class="title">
+			<h1>STATUS</h1>
+			
+		</div>
+		<ul>
+			<div class="row">
+ 				<div class="column">
+				<img src= "4.jpg" alt="Dustbin 1" style="width:50%">
+				<h2>DUSTBIN 1</h2>
+				<li>Location: Near canteen</li><br>
+				<div class="butter">
+				     <div id="demo"></div>
+            
+            </div>
+
+				</div>
+				<div class="column">
+				<img src= "4.jpg" alt="Dustbin 2" style="width:50%">
+				<h2>DUSTBIN 2</h2>
+				<li>Location: Near entrance</li>
+				<br> 
+				
+				<div class="butter">
+				<input class="field" type="text" id="sa" >
+            </div>
+				</div>
+			</div>
+			
+		</ul>
+	</header>
+	<script>
+	$(function()
+	{
+
+
+var client = mqtt.connect('wss://smart_bin:12345678@broker.shiftr.io', {
+  clientId: 'javascript'
+});
+
+client.on('connect', function(){
+  client.subscribe('/smart_bin');
+});
+
+client.on("message", function (topic, payload)              //Prints the Msg
+			{
+			    document.getElementById("demo").innerHTML= "";
+			    document.getElementById("demo").innerHTML= "status: ";
+				document.getElementById("demo").innerHTML+= payload;
+			});
+})
+	</script>
+</body>
+</html>
